@@ -1,0 +1,660 @@
+---
+title: "Examen 2025. Módulo 3"
+author: "Óscar Porta"
+date: "2025-03-03"
+output: 
+  html_document:
+    theme: flatly
+    code_folding: hide
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+---
+```{=html}
+<style>
+  table {
+    width: 100% !important;
+  }
+</style>
+
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1 Modelo de regresión simple
+### 1.1 Lectura de datos y estadísticas descriptivas.
+```{r eval=FALSE, include=FALSE}
+install.packages("memisc")
+install.packages("MCMCpack")
+install.packages("mgcv")
+```
+```{r}
+# Cargamos las librerias que necesitaremos durante el ejercicio.
+library(memisc)
+library(lmtest)
+library(MCMCpack)
+library(MASS)
+library(glmnet)
+library(mgcv)
+
+```
+```{r}
+# Cargamos la base de datos Freeny
+data("freeny")
+
+# Visualizamos la estructura del objeto
+str(freeny)
+```
+
+
+```{r}
+# Obtenemos un resumen de estadísticas descriptivas
+summary(freeny)
+```
+Tenemos 39 observaciones y 5 variables. La variable y (ventas) es una serie temporal que varía de aproximadamente 8.79 a 9.79, lo que indica que las ventas se mantienen en un rango estrecho a lo largo del tiempo.
+
+La media de las ventas es de 9.306, muy cercana a la mediana (9.314), lo cual sugiere una distribución relativamente simétrica de las ventas. Las demás variables también presentan rangos reducidos: por ejemplo, el índice de precios varía de 4.278 a 4.710, y el nivel de renta de 5.821 a 6.200.
+
+```{r}
+# Mostramos las primeras 6 observaciones
+head(freeny)
+
+# Mostramos las últimas 6 observaciones
+tail(freeny)
+```
+
+```{r}
+# Calculamos la matriz de varianzas (varianza-covarianza)
+var_matrix <- var(freeny)
+print("Matriz de varianzas:")
+print(var_matrix)
+```
+La varianza de y es 0.0996, mientras que la de la variable retrasada es prácticamente igual (0.0995). Esto confirma que las ventas de un trimestre están casi idénticamente relacionadas con las del trimestre anterior. Además, la covarianza entre y y el índice de precios es negativa (-0.04165), sugiriendo que, al aumentar el precio, las ventas tienden a disminuir.
+
+```{r}
+# Calculamos la matriz de correlaciones
+cor_matrix <- cor(freeny)
+print("Matriz de correlaciones:")
+print(cor_matrix)
+```
+
+La correlación entre __y__ y la variable retrasada es de 0.9978, lo cual es extremadamente alto y refleja la fuerte dependencia temporal en la serie. 
+Por otro lado, el __índice de precios__ tiene una correlación negativa muy alta con __y__ (-0.9895), lo que indica que un incremento en el precio se asocia fuertemente con una disminución en las ventas. Las correlaciones de __y__ con el __nivel de renta__ (0.9839) y con el __potencial del mercado__ (0.9966) son también muy elevadas, lo que sugiere que estas variables están estrechamente relacionadas con las ventas.
+
+
+__En resumen,__ los resultados del análisis exploratorio nos indican una fuerte dependencia temporal (muy alta correlación entre y y su retraso) y relaciones muy marcadas entre las ventas y las variables explicativas (notablemente, el precio muestra una relación negativa muy pronunciada). Estas relaciones tan fuertes nos deben alertar sobre la posibilidad de multicolinealidad, algo que tendremos que tener en cuenta en los modelos de regresión posteriores.
+
+### 1.2 Estimar modelo que relaciones el precio de freebny con las ventas de freeny.
+
+En este apartado vamos a ajustar un modelo de regresión lineal simple en el que nuestra variable de respuesta es la serie de ventas (y) y la variable explicativa es el índice de precios (price.index). 
+La hipótesis es que, al aumentar el precio, las ventas disminuyen, por lo que esperamos un coeficiente negativo.
+
+```{r}
+# Ajustamos el modelo de regresión lineal simple
+# En este modelo, consideramos "freeny.y" como nuestra variable de respuesta (ventas) y usamos la segunda columna de "freeny.x" (índice de precios) como variable explicativa.
+
+modelo_simple <- lm(freeny.y ~ freeny.x[, 2], data = freeny)
+
+# Visualizamos un resumen del modelo para obtener los coeficientes, errores estándar, t-valor y p-valor
+summary(modelo_simple)
+
+```
+
+El __coeficiente negativo__ indica que, en promedio, por cada aumento de una unidad en el índice de precios, las ventas disminuyen en aproximadamente 2.3419 unidades. Esto respalda nuestra hipótesis de que el incremento en el precio se asocia con menores ventas.
+
+Nos encontramos con __p-valores__ extremadamente bajos (<2e-16). Esto significa que ambos coeficientes están estimados con gran precisión y son altamente significativos.
+
+R-cuadrado (0.9791):
+El __R²__ indica que alrededor del 97.91% de la variabilidad en las ventas es explicada únicamente por el índice de precios. Este valor tan elevado nos muestra que el modelo tiene un excelente ajuste a los datos.
+
+El valor del __F__ y su __p-valor__ (< 2.2e-16) confirman que el modelo es globalmente significativo, es decir, que el índice de precios tiene un impacto importante en las ventas.
+
+En resumen, nosotros concluimos que existe una relación fuerte y significativamente negativa entre el índice de precios y las ventas, y que el modelo ajustado explica casi toda la variabilidad de las ventas en la base Freeny.
+
+
+### 1.3 Obtener los intervalos de confianza de los parametros.
+```{r}
+# Obtenemos los intervalos de confianza para los coeficientes del modelo simple.
+# Esto nos permitirá conocer el rango en el que es probable que se encuentren los valores reales de los parámetros.
+confint_modelo <- confint(modelo_simple)
+
+# Imprimimos los intervalos de confianza obtenidos.
+print("Intervalos de confianza de los parámetros:")
+print(confint_modelo)
+
+```
+__Intercepto:__ Su intervalo de confianza va de 19.32 a 20.35. Esto significa que, con un nivel de confianza del 95%, estimamos que el valor verdadero del intercepto se encuentra en ese rango. Aunque el intercepto en este modelo no tiene una interpretación práctica directa (pues un índice de precios igual a cero no es realista), nos indica que nuestra estimación es estable y precisa.
+
+__Coeficiente del índice de precios:__ Su intervalo de confianza es de -2.456 a -2.228. Al estar completamente en territorio negativo, confirmamos con alta confianza que existe una relación inversa entre el índice de precios y las ventas. Es decir, por cada aumento de una unidad en el índice de precios, las ventas se reducen, en promedio, entre 2.456 y 2.228 unidades.
+
+En resumen, nosotros interpretamos que la relación entre el precio y las ventas es fuertemente negativa y que nuestra estimación es muy precisa, dado que el intervalo es estrecho y completamente negativo. Esto respalda la hipótesis planteada de que un incremento en el precio se asocia a una disminución en las ventas.
+
+### 1.4 Evaluar coeficiente de determinación y residuos.
+
+Vamos a proceder a extraer el R² del resumen del modelo, y tambien observaremos la distribución de los residuos para asegurarnos de que se comporten de forma aleatoria (lo que es un supuesto básico de la regresión lineal). Esto lo haremos graficando los residuos los residuos del modelo para detectar posibles patrones o problemas (por ejemplo, heterocedasticidad o falta de aleatoriedad).
+
+```{r}
+# Extraemos el R-squared del modelo simple.
+r2 <- summary(modelo_simple)$r.squared
+print(paste("R-squared:", round(r2, 4)))
+
+# Graficamos los residuos del modelo simple.
+plot(modelo_simple$residuals, 
+     main = "Gráfico de residuos del modelo simple",
+     xlab = "Índice de observación",
+     ylab = "Residuos",
+     type = "h")
+abline(h = 0, col = "red", lwd = 2)
+
+```
+
+
+
+El valor tan alto de R² confirma la fortísima relación entre ambas variables y sugiere que el modelo capta gran parte de la variación de las ventas.
+
+__Conclusiones del gráfico de residuos:__
+
+Observamos que los residuos se concentran en un rango bastante estrecho, aproximadamente entre -0.06 y +0.08.
+
+La línea roja (h = 0) nos sirve de referencia para ver si hay sesgos positivos o negativos. En general, los residuos parecen distribuirse de forma relativamente equilibrada en torno a cero.
+
+No obstante, como se trata de datos de serie temporal, podrían existir ligeros patrones cíclicos (por ejemplo, tramos en los que los residuos son mayormente positivos o negativos), lo cual es común en series que presentan autocorrelación.
+
+Aun así, no se aprecia un patrón marcado que sugiera un grave incumplimiento de los supuestos de homocedasticidad o linealidad.
+
+Vamos a comprobar si exziste autocorrelación entre los residuos, para ello realizamos el test de Durbin-Watson que contrasta la hipótesis nula de “no existe autocorrelación en los residuos” frente a la alternativa de “existe autocorrelación (positiva o negativa) en los residuos".
+
+```{r}
+# Realizamos el test de Durbin-Watson
+dw_result <- dwtest(modelo_simple)
+
+# Visualizamos los resultados
+print(dw_result)
+
+```
+Además utilizamos el método visual pintando la función de autocorrelación (ACF) y la función de autocorrelación parcial (PACF) de los residuos:
+
+```{r}
+# Graficar la ACF de los residuos
+acf(modelo_simple$residuals, main = "ACF de los residuos")
+
+# Graficar la PACF de los residuos
+pacf(modelo_simple$residuals, main = "PACF de los residuos")
+
+```
+Conclusiones:
+
+__DW__ = 0.34731: Este valor está muy por debajo de 2, lo cual indica una fuerte autocorrelación positiva en los residuos (valores cercanos a 0 implican que los residuos consecutivos están fuertemente correlacionados).
+
+__p-value__ = 1.394e-12: El p-valor es extremadamente bajo, por lo que rechazamos la hipótesis nula de “no autocorrelación” y concluimos que existe autocorrelación positiva en los residuos.
+
+Observamos en los gráficos ACF y PACF que varios retardos (lags) salen de los intervalos de confianza (líneas azules punteadas), algunos son significativamente altos (por encima de la línea de confianza). Esto indica que los residuos de un período están fuertemente correlacionados con los del período anterior, lo que confirma la autocorrelación positiva
+
+En resumen, los gráficos ACF/PACF y el test Durbin-Watson coinciden en mostrar que la hipótesis de independencia de los residuos no se cumple, y por lo tanto, sería recomendable utilizar técnicas específicas para series temporales.
+
+### 1.5 Realizar el contraste de si la relación entre precios y ventas de freeny es negativa con un nivel de significación del 0.05
+
+En este punto, queremos formalizar la prueba de hipótesis para determinar si, efectivamente, el coeficiente que relaciona el precio con las ventas es menor que cero. Esto implica un test unilateral:
+
+Hipótesis nula (\(H_0\)): \(\beta_1 = 0\)
+
+Hipótesis alternativa (\(H_a\)): \(\beta_1 < 0\)
+
+
+```{r}
+# Extraemos el coeficiente y el p-valor bilateral para la variable de precio
+coef_est <- coef(summary(modelo_simple))["freeny.x[, 2]", "Estimate"]
+p_value_two_sided <- coef(summary(modelo_simple))["freeny.x[, 2]", "Pr(>|t|)"]
+
+# Calculamos el p-valor unilateral según el signo del coeficiente
+if (coef_est < 0) {
+  p_value_one_sided <- p_value_two_sided / 2
+} else {
+  p_value_one_sided <- 1 - p_value_two_sided / 2
+}
+
+# Imprimimos resultados
+cat("Coeficiente estimado (precio):", round(coef_est, 4), "\n")
+cat("p-valor bilateral:", format(p_value_two_sided, scientific = TRUE), "\n")
+cat("p-valor unilateral:", format(p_value_one_sided, scientific = TRUE), "\n")
+
+# Evaluamos la hipótesis con un nivel de significación de 0.05
+alpha <- 0.05
+if (p_value_one_sided < alpha) {
+  cat("Conclusión: Rechazamos H0; la relación entre precio y ventas es significativamente negativa.\n")
+} else {
+  cat("Conclusión: No se rechaza H0; no hay evidencia suficiente de una relación negativa.\n")
+}
+
+```
+__Conclusión:__
+
+Puesto que el p-valor unilateral es mucho menor que 0.05, rechazamos la hipótesis nula \(\beta_1 = 0\) y concluimos que la relación entre el precio y las ventas de Freeny es estadísticamente negativa. 
+Esto concuerda con la intuición económica de que, a mayor precio, menores ventas.
+
+Cabe señalar que, desde una perspectiva de series temporales, hemos detectado autocorrelación en los residuos, por lo que en un análisis más riguroso sería recomendable aplicar métodos que corrijan esa autocorrelación. Aun así, en términos puramente estadísticos, este test confirma la existencia de un coeficiente negativo.
+
+## 2.Regresión multiple
+### 2.1 Explique el mejor modelo explicativo de las ventas de juguetes con las variables del dataset.
+
+Aplicamos un procedimiento de selección __stepwise__ (bidireccional) para identificar qué combinación de variables ofrece el mejor equilibrio entre ajuste y simplicidad, basándonos en el criterio AIC. 
+
+```{r}
+# Ajustamos el modelo completo utilizando todas las variables explicativas
+# En nuestro data frame 'freeny', la variable respuesta es 'freeny.y' y las variables explicativas son: 'lag.quarterly.revenue', 'price.index', 'income.level' y 'market.potential'.
+modelo_completo <- lm(freeny.y ~ lag.quarterly.revenue + price.index + income.level + market.potential, data = freeny)
+
+# Utilizamos el método stepwise para seleccionar el mejor modelo con este método evaluamos de forma iterativa la inclusión y eliminación de variables basándonos en el criterio AIC.
+mejor_modelo <- step(modelo_completo, direction = "both", trace = FALSE)
+
+# Mostramos un resumen del modelo seleccionado
+summary(mejor_modelo)
+
+```
+
+__Conclusiones:__
+
+__price.index: −0.83488__
+
+  Este coeficiente negativo nos indica que, en promedio, un incremento de 1 unidad en el índice de precios se asocia con una disminución de   0.8349 unidades en las ventas. Esta relación es consistente con la intuición de que precios mayores se asocian a menores ventas.
+
+__income.level: 0.84556__
+
+  El coeficiente positivo indica que, manteniendo constantes las otras variables, un aumento de 1 unidad en el nivel de renta se relaciona   con un aumento de 0.8456 unidades en las ventas.
+
+__market.potential: 1.62735__
+
+  De forma similar, un mayor potencial de mercado se asocia con un aumento en las ventas.
+
+__Significancia estadística:__
+  Todos los coeficientes presentan p-valores muy bajos (por ejemplo, \(2.44 \times 10^{-7}\)  para price.index y \(4.47 \times 10^{-10}\)     para income.level), lo que nos indica que cada una de estas variables es significativamente relevante en la explicación de las ventas.
+
+__Ajuste del modelo:__
+
+  El R² múltiple es 0.998 y el R² ajustado es 0.9978, lo que significa que aproximadamente el 99.8% de la variabilidad en las ventas se explica mediante este modelo. Esto sugiere un ajuste casi perfecto.
+El F-statistic es muy alto (5846) con un p-valor menor a \(2.2 \times 10^{-16}\), lo que confirma que, en conjunto, las variables incluidas explican significativamente la variabilidad de la variable respuesta.
+
+__En resumen,__ nosotros concluimos que el modelo de regresión múltiple que seleccionamos es extremadamente eficaz para explicar las ventas de juguetes, utilizando como predictores el índice de precios, el nivel de renta y el potencial de mercado. Cada una de estas variables es estadísticamente significativa y la relación entre precio y ventas es negativa, mientras que las otras variables tienen efecto positivo.
+
+## 2.2 Mejore el modelo utilizando glm. Utilice como criterio de decisión el AIC, y pseudo R cuadrado.
+Mejoramos el modelo seleccionado utilizando la función glm() con la distribución gaussiana, que es la que se asume habitualmente para los errores en un modelo de regresión lineal.
+Probamos 3 modelos diferentes:
+
+```{r}
+# Modelo GLM A: Modelo completo con todas las variables explicativas
+modelo_glm_A <- glm(freeny.y ~ lag.quarterly.revenue + price.index + income.level + market.potential,
+                    data = freeny, family = gaussian())
+
+# Modelo GLM B: Modelo sin la variable 'lag.quarterly.revenue'
+modelo_glm_B <- glm(freeny.y ~ price.index + income.level + market.potential,
+                    data = freeny, family = gaussian())
+
+# Modelo GLM C: Modelo que incluye un término polinómico de grado 2 para 'price.index'
+modelo_glm_C <- glm(freeny.y ~ poly(price.index, 2) + income.level + market.potential,
+                    data = freeny, family = gaussian())
+
+# Calculamos el AIC para cada modelo
+aic_glm_A <- AIC(modelo_glm_A)
+aic_glm_B <- AIC(modelo_glm_B)
+aic_glm_C <- AIC(modelo_glm_C)
+
+# Calculamos el pseudo R-squared para cada modelo utilizando la fórmula:
+# (Null Deviance - Residual Deviance) / Null Deviance
+pseudo_R2_A <- (modelo_glm_A$null.deviance - modelo_glm_A$deviance) / modelo_glm_A$null.deviance
+pseudo_R2_B <- (modelo_glm_B$null.deviance - modelo_glm_B$deviance) / modelo_glm_B$null.deviance
+pseudo_R2_C <- (modelo_glm_C$null.deviance - modelo_glm_C$deviance) / modelo_glm_C$null.deviance
+
+# Creamos una tabla resumen para comparar AIC y pseudo R-squared
+modelos <- c("GLM A (completo)", "GLM B (sin lag)", "GLM C (polinómico en precio)")
+AIC_valores <- c(aic_glm_A, aic_glm_B, aic_glm_C)
+pseudo_R2_valores <- c(pseudo_R2_A, pseudo_R2_B, pseudo_R2_C)
+resumen_modelos_glm <- data.frame(Modelo = modelos, 
+                                  AIC = round(AIC_valores, 2),
+                                  Pseudo_R2 = round(pseudo_R2_valores, 4))
+print(resumen_modelos_glm)
+
+```
+
+Al utilizar glm() con la familia gaussian, estamos ajustando esencialmente el mismo modelo que el obtenido con lm(). Esto significa que como hemos podido comprobar el AIC y el pseudo R² resultantes serán prácticamente iguales al del modelo lineal, ya que la familia gaussian es la que se asume de forma implícita en lm(). Aún así, esto es útil si queremos explorar si alguna transformación o eliminación de variables mejora el ajuste.
+
+Al interpretar los resultados vemos que el Modelo GLM C (polinómico en precio) es el mejor, ya que presenta el AIC más bajo y un pseudo R² ligeramente superior. Esto sugiere que introducir una transformación polinómica en la variable de precio permite capturar de forma sutil una relación no lineal entre el precio y las ventas, lo cual mejora el ajuste del modelo sin agregar complejidad innecesaria.
+
+
+## 2.3 Estime el mismo por un procedimiento Bayesiano, y indique si este método de estimación mejora los resultados de los anteriores métodos
+
+```{r}
+# Ajustamos el modelo Bayesiano con MCMCregress utilizando la misma especificación que nuestro mejor modelo
+modelo_bayes <- MCMCregress(freeny.y ~ price.index + income.level + market.potential, 
+                            data = freeny)
+
+# Mostramos un resumen del modelo Bayesiano
+summary(modelo_bayes)
+
+# Graficamos el modelo para evaluar la convergencia y el comportamiento de las cadenas
+plot(modelo_bayes)
+
+# Calculamos el error residual bayesiano
+
+error_residual_bayes <- sqrt(mean(modelo_bayes[, "sigma2"]))
+cat("Error residual Bayesiano:", round(error_residual_bayes, 4), "\n")
+
+```
+Los coeficientes estimados son prácticamente idénticos en ambos métodos. Por ejemplo, el coeficiente para price.index es de aproximadamente (−0.8349) tanto en el enfoque frecuentista (MLG/MCO) como en el bayesiano. Esto indica que la relación entre el índice de precios y las ventas se estima de manera muy similar en ambos métodos.
+
+El error residual bayesiano (0.0161) es comparable al residual estándar obtenido en el modelo MLG/MCO (alrededor de 0.0147).Esto nos indica que, en términos puramente predictivos y de ajuste, el método bayesiano no mejora sustancialmente los resultados obtenidos con los métodos frecuentistas. 
+
+Como los trace plot indican una cadena estable y no presentan patrones extraños, y las density plot muestran una distribución unimodal relativamente concentrada, entonces podemos tener confianza en que nuestras estimaciones bayesianas son estables y confiables.
+
+En resumen, para nuestros datos y con la especificación del modelo utilizada, ambos enfoques ofrecen resultados muy similares en términos de ajuste y error residual, de modo que el método bayesiano no aporta una mejora sustancial, pero sí información adicional sobre la incertidumbre en las estimaciones.
+
+## 2.4 Calcule las distancias de cook, si lo considera conveniente realice una estimación robusta. Justifique su decisión
+
+Vamos a calcular las distancias de Cook para el modelo que seleccionamos (el modelo MLG con price.index, income.level y market.potential).Las distancias de Cook nos permitiran identificar cuánto influye cada observación en la estimación global del modelo. 
+
+```{r}
+# Calculamos las distancias de Cook para el modelo
+cooks_vals <- cooks.distance(mejor_modelo)
+
+# Creamos un data.frame con el nombre de la observación y la distancia de Cook
+cooks_table <- data.frame(
+  Observation = names(cooks_vals),
+  CookDistance = cooks_vals
+)
+
+# Imprimimos la tabla
+print(cooks_table)
+
+# Graficamos las distancias de Cook y añadimos una línea de referencia
+plot(cooks_vals, type = "h", main = "Distancias de Cook",
+     xlab = "Índice de observación", ylab = "Distancia de Cook")
+# Umbral de referencia: 4/n (en nuestro caso n es el número de observaciones del modelo)
+n_obs <- length(cooks_vals)
+abline(h = 4 / n_obs, col = "red", lwd = 2, lty = 2)
+cat("Umbral (4/n):", round(4 / n_obs, 4), "\n")
+```
+
+Obsevamos de manera visual que solo la observación de 1963 supera el umbral 4/n y, por tanto, puede considerarse potencialmente influyente. El resto de los datos parecen no ejercer un impacto excesivo en la estimación. Con estos resultados, podríamos justificar la conveniencia de un modelo robusto.
+
+Aún así vamos a comprobar con una función los valores que superan el umbral y en caso de ser así, pasaremos a realizar un modelo robusto.
+
+```{r}
+# Verificamos si alguna observación supera el umbral 4/n
+umbral <- 4 / n_obs
+influyentes <- which(cooks_vals > umbral)
+
+if (length(influyentes) > 0) {
+  cat("Observaciones influyentes (Cook's distance > 4/n):\n")
+  print(influyentes)
+  cat("Ajustaremos un modelo robusto para comparar:\n\n")
+  
+  # Ajustamos el modelo robusto con la misma especificación
+  modelo_robusto <- rlm(freeny.y ~ price.index + income.level + market.potential, data = freeny)
+  
+  # Vemos un resumen del modelo robusto
+  print(summary(modelo_robusto))
+  
+  # Podemos comparar, por ejemplo, los coeficientes y el error residual
+  cat("\nCoeficientes del modelo robusto:\n")
+  print(coef(modelo_robusto))
+  
+  # Calculamos y mostramos el error residual robusto (la función rlm no reporta un RSE igual que lm, pero podemos ver la escala interna que usa rlm)
+  cat("Escala (s) del modelo robusto (análogo al error residual):\n")
+  print(modelo_robusto$s)
+  
+} else {
+  cat("No se han detectado observaciones influyentes (Cook's distance > 4/n).\n")
+  cat("No ajustamos modelo robusto.\n")
+}
+
+```
+__Conclusiones sobre los resultados del modelo robusto:__
+
+__Coeficientes:__
+Los coeficientes estimados en el modelo robusto son muy similares a los obtenidos previamente en el modelo MCO/MLG.
+El intercepto es (−13.2822).
+
+El coeficiente para price.index es (−0.8373) indicando que un aumento en el índice de precios se asocia con una disminución en las ventas. income.level y market.potential tienen coeficientes positivos (0.8387 y 1.6292, respectivamente), lo que sugiere que a mayores niveles de renta y mayor potencial de mercado, se incrementan las ventas.
+
+Esta similitud en los coeficientes sugiere que, aunque detectamos una observación influyente (la observación de 1963, identificada por su Cook's distance), su impacto no distorsiona de forma importante las estimaciones globales del modelo.
+__Error residual:__
+
+El error residual (o escala interna) del modelo robusto es 0.01644, muy similar al error residual obtenido con el modelo GLM/OLS (alrededor de 0.0147). Esto confirma que el ajuste del modelo se mantiene excelente y la presencia de la observación influyente no afecta significativamente la capacidad predictiva del modelo.
+
+En resumen, aunque encontramos una observación con Cook's distance alta, la estimación robusta confirma que el impacto de dicha observación sobre el modelo es mínimo, lo que respalda la validez de nuestro modelo frecuentista. 
+
+## 2.5 A la vista de las variables explicativas cree que sería más adecuado estimar el modelo utilizando la regresión ridge o el mínimo cuadrado ordinario. En caso afirmativo estime el modelo y analice sus resultados
+
+La regresión ridge es especialmente útil en situaciones de multicolinealidad, porque estabiliza las estimaciones, aunque introduce algo de sesgo.Dado que en nuestro modelo de regresión múltiple observamos que algunas de las variables explicativas están altamente correlacionadas vamos a plantear una regresión de Ridge con lo que podremos determinar si mejoramos la estabilidad y el desempeño del modelo en comparación con el enfoque MCO.
+
+```{r}
+# Preparamos los datos:
+X <- as.matrix(freeny[, c("price.index", "income.level", "market.potential")])
+y <- as.numeric(freeny$y)  # Convertimos 'y' a vector numérico
+
+# Ajustamos el modelo ridge con validación cruzada
+cv_ridge <- cv.glmnet(X, y, alpha = 0, standardize = TRUE)
+
+# Mostramos el valor óptimo de lambda
+cat("Valor óptimo de lambda:", cv_ridge$lambda.min, "\n")
+
+# Extraemos los coeficientes del modelo ridge en el lambda óptimo
+coef_ridge <- coef(cv_ridge, s = "lambda.min")
+cat("Coeficientes del modelo ridge:\n")
+print(coef_ridge)
+
+# Calculamos las predicciones del modelo ridge
+pred_ridge <- predict(cv_ridge, newx = X, s = "lambda.min")
+
+# Calculamos el error residual (RMSE) para el modelo ridge
+rmse_ridge <- sqrt(mean((y - pred_ridge)^2))
+cat("Error residual (RMSE) del modelo ridge:", round(rmse_ridge, 4), "\n")
+
+
+```
+__Conclusiones:__
+Aunque observabamos que algunas de las variables explicativas están altamente correlacionadas observamos que la regresión ridge no aporta una mejora sustancial en el ajuste o en la capacidad predictiva respecto al modelo de mínimos cuadrados ordinarios.
+
+__Coeficientes:__
+Los coeficientes estimados en el modelo ridge son muy similares a los obtenidos con mínimos cuadrados ordinarios (MCO). Por ejemplo, para la variable price.index tenemos:
+
+MCO: –0.8349
+
+Ridge: –0.7801
+
+Esto indica una leve contracción (shrinkage) de los coeficientes en el modelo ridge, lo que es el efecto esperado al penalizar la magnitud de los coeficientes para estabilizarlos, especialmente en presencia de alta correlación entre predictores.
+
+__Error residual:__
+
+El error residual (RMSE) del modelo ridge es 0.0172, mientras que en el modelo MCO/GLM se obtuvo un error residual de aproximadamente 0.0147. Aunque el error residual es ligeramente mayor en el modelo ridge, las diferencias son muy pequeñas.
+
+
+### 3. Estimar modelo que relacione el precio de freeny con las ventas de freeny, utilizando polinomios. Analice los resultados obtenidos
+
+Vamos a utilizar un modelo aditivo generalizado, el cual nos permite realizar ajustes de tipo no lineal. Entre las bondades de estos modelos estan la no necesidad de probar que las variables son independientes y si tienen o no una distribución normal. 
+
+En nuestro caso, vamos a ajustar un modelo que relacione el precio de freeny (price.index) con las ventas (freeny.y) usando splines cúbicos. De esta forma, evaluaremos si la relación entre el precio y las ventas es no lineal y si capturar esa no linealidad mejora el ajuste del modelo.
+
+```{r}
+# Ajustamos el modelo GAM usando un spline cúbico para price.index
+modelo_gam <- gam(freeny.y ~ s(price.index, k = 4), family = gaussian, data = freeny)
+
+# Mostramos el resumen del modelo
+summary(modelo_gam)
+
+# Graficamos la función suave ajustada para visualizar la relación
+plot(modelo_gam, main = "Modelo GAM: Ventas vs Price Index", xlab = "Price Index", ylab = "Función suave")
+
+```
+__Análisis datos obtenidos:__
+
+__Coeficiente paramétrico (Intercept):__
+
+El intercepto es 9.3063, lo que coincide aproximadamente con el valor medio de las ventas en la serie (rango de 8.79 a 9.79). 
+Este valor representa la estimación de las ventas cuando el valor del predictor (price.index) se encuentra en el nivel de referencia para la función suave.
+
+__Término suave: s(price.index, k = 4)__
+
+La salida nos indica que el término suave tiene un edf (grados de libertad efectivos) de 2.476.
+Un edf mayor que 1 indica que la relación entre price.index y freeny.y es no lineal; en este caso, la función suave tiene flexibilidad para curvarse y no está forzada a una relación estrictamente lineal.
+
+La significancia del término suave (F = 1147, p < 2e-16) muestra que esta no linealidad es altamente relevante para explicar las ventas.
+
+__Medidas de ajuste:__
+
+El R² ajustado es 0.988 y la devianza explicada es 98.9%, lo que indica que el modelo explica casi el 99% de la variabilidad en las ventas.
+El GCV (Generalized Cross-Validation) y el valor de la escala son muy bajos, lo que refuerza que el ajuste es excelente.
+
+__Comparación con MCO__
+
+Aunque ambos modelos tienen un muy buen ajuste (R² muy alto), el modelo GAM muestra un ajuste ligeramente mejor (R² ajustado de 0.988 vs. 0.9791 en MCO). Esto sugiere que incorporar la flexibilidad de los splines cúbicos mejora la capacidad del modelo para captar la relación entre precio y ventas, aunque la mejora sea modesta.
+
+## 4. Cree una variable temporal relativa al año y otra relativa al trimestre. Realice un modelo ANOVA para las ventas utilizando el año y el trimestre, estime un modelo de ancova utilizando el precio como covariable. Comente los resultados
+
+A continuación procedemos a crear las variables temporales a partir de los nombres de las filas, respetando la convención que nos indica el enunciado:
+
+• Si la parte decimal es 0 (es decir, no hay decimal), se corresponde con el primer trimestre (Q1).
+• Si es 0.25, corresponde a Q2.
+• Si es 0.50, a Q3.
+• Si es 0.75, a Q4.
+
+Generamos un vector numérico a partir de los nombres de las filas, extraemos la parte entera (año) y la parte decimal, y mapeamos esa parte decimal al trimestre según lo indicado.
+
+```{r}
+# Extraemos el vector numérico a partir de los nombres de las filas del dataset
+time_values <- as.numeric(rownames(freeny))
+
+# Tomamos la parte entera de cada valor para el año
+year <- floor(time_values)
+
+# Calculamos la parte decimal, que nos indica el trimestre según nuestra convención
+rem <- round(time_values - year, 2)
+
+# Nosotros mapeamos la parte decimal a trimestre:
+# Si el residuo es 0, interpretamos que es Q1;
+# si es 0.25, Q2; si es 0.50, Q3; y si es 0.75, Q4.
+quarter <- ifelse(rem == 0, 1,
+                  ifelse(rem == 0.25, 2,
+                         ifelse(rem == 0.50, 3,
+                                ifelse(rem == 0.75, 4, NA))))
+
+# Convertimos 'year' y 'quarter' a factores para tratarlas como variables categóricas
+year <- as.factor(year)
+quarter <- as.factor(quarter)
+
+# Nosotros creamos un nuevo data frame que incluye las ventas, el índice de precios, el año y el trimestre
+data_time <- data.frame(
+  sales = freeny$y,
+  price_index = freeny$price.index,
+  year = year,
+  quarter = quarter
+)
+
+# Revisamos las primeras filas para confirmar que las variables se han creado correctamente
+head(data_time)
+
+
+```
+Una vez creadas las dos variables temporales pasamos a realizar el __modelo ANOVA__, en el que modelamos las ventas (sales) en función de los factores “year” y “quarter”.
+
+```{r}
+# Ajustamos el modelo ANOVA aditivo: ventas ~ año + trimestre
+
+model_anova_add <- aov(sales ~ year + quarter, data = data_time)
+
+# Revisamos el resumen del modelo para ver los grados de libertad residuales, los F values y los p-valores con asteriscos de significación.
+summary(model_anova_add)
+```
+__Conclusiones modelo ANOVA__
+
+Para el factor __year__:
+El F value es extremadamente alto (1777.32) y su p-valor (< 2e-16) es prácticamente cero, lo que nos indica que las diferencias en las ventas entre años son altamente significativas.
+
+Para el factor __quarter__:
+El F value de 65.43, junto con un p-valor muy bajo (3.03e-12), indica que también existen diferencias significativas entre los trimestres, aunque la magnitud de la variabilidad explicada por este factor es mucho menor en comparación con el de los años.
+
+Los __Residuals__ tienen 26 grados de libertad y una suma de cuadrados de 0.006, con un Mean Square de 0.0002. Esto indica que la variabilidad que no se explica por los factores (error) es muy pequeña en comparación con la variabilidad explicada por los efectos de año y trimestre.
+
+En resumen, nosotros interpretamos que el efecto del año es el principal motor de la variabilidad en las ventas, y aunque el efecto de los trimestres también es significativo, su contribución es mucho menor. La alta relación entre el Mean Square de cada factor y el error (residual) se refleja en los valores F muy altos y en los p-valores prácticamente cero, lo que nos permite rechazar la hipótesis nula de que no existen diferencias en las medias de ventas entre años o entre trimestres.
+
+__Anexo:__ Debemos tener en cuenta que la media de ventas para 1962 se calcula a partir de tres trimestres, mientras que los demás años (1963 a 1971) se basan en cuatro trimestres. Esto puede sesgar las comparaciones entre años, ya que el comportamiento de Q1 (que podría diferir notablemente de los otros trimestres) no se está considerando para 1962.
+
+```{r}
+# Construimos una tabla de medias para ver los promedios de ventas en cada grupo (por año y trimestre)
+anova_means <- model.tables(model_anova_add, type = "means")
+print(anova_means)
+
+```
+La media global de las ventas es 9.306304.
+
+En el desglose por __año__, se observa una tendencia clara de incremento. En 1962 la media es 8.8 y va aumentando progresivamente hasta alcanzar 9.759 en 1971. Esto indica que, a lo largo de los años, las ventas han experimentado un crecimiento considerable.
+
+El número de replicados (rep) en la tabla de “year” nos muestra que 1962 tiene 3 observaciones (debido a la ausencia del primer trimestre), mientras que los años restantes cuentan con 4 observaciones, lo cual es coherente con la estructura de la serie.
+
+En cuanto al efecto por __trimestre__, los promedios son:
+
+Q1: 9.253
+
+Q2: 9.3
+
+Q3: 9.32
+
+Q4: 9.347
+
+Esto nos indica que, aunque las diferencias entre trimestres son mucho menores que entre años, hay una ligera tendencia ascendente de Q1 a Q4.
+
+El número de replicados en “quarter” también es informativo: Q1 tiene 9 observaciones (porque en 1962 no hay Q1), mientras que Q2, Q3 y Q4 tienen 10 observaciones cada uno.
+
+
+En resumen,interpretamos que el efecto del año es el principal motor de la variabilidad en las ventas, con un aumento considerable a lo largo de los años. 
+
+Por otro lado, el efecto del trimestre es muy sutil, mostrando una leve tendencia de incremento de ventas a medida que avanza el año.
+
+Además, es importante comentar que la ausencia del primer trimestre en 1962 implica que ese año está representado de forma incompleta (solo Q2 a Q4). Esto puede afectar la comparación entre años, ya que el promedio de ventas de 1962 se calcula a partir de tres trimestres, lo que debe tenerse en cuenta al interpretar el efecto “año” en nuestro análisis.
+
+
+A continuación, estimamos el __modelo ANCOVA__ en el que la variable de respuesta es sales (ventas) y las variables explicativas son los factores temporales (year y quarter) junto con la covariable price_index. Esto nos permite evaluar si, al ajustar por el efecto del precio, las diferencias entre los grupos de año y trimestre siguen siendo significativas, y además, cuán importante es la influencia del precio sobre las ventas.
+
+```{r}
+# Estimamos el modelo ANCOVA:
+# Incluimos 'year' y 'quarter' como factores y 'price_index' como covariable.
+model_ancova <- lm(sales ~ year + quarter + price_index, data = data_time)
+
+# Revisamos el resumen del modelo ANCOVA para ver los coeficientes, errores, t-values, p-valores y el R².
+summary(model_ancova)
+
+```
+
+Tanto para el efecto de los años como los trimestres las conclusiones son las mismas que tras el modelo ANOVA.
+
+__Efecto del Año:__
+
+Los coeficientes para cada año (comparados con el año de referencia, que en este caso es 1962) son positivos y estadísticamente significativos (p < 0.01 para todos).
+Esto indica que, manteniendo constantes el trimestre y el precio, las ventas han ido aumentando de forma progresiva desde 1962. Por ejemplo, en 1971 el efecto es de 0.61307, lo que significa que, en promedio, las ventas de 1971 son aproximadamente 0.61 unidades mayores que en 1962.
+
+__Efecto del Trimestre:__
+
+Los coeficientes para los trimestres 2, 3 y 4 (con Q1 como referencia) también son positivos y muy significativos (p < 0.0001).
+Aunque las diferencias son menores que las observadas entre años, se observa una tendencia ascendente dentro del año. Es decir, comparado con el primer trimestre, los siguientes trimestres muestran ventas ligeramente mayores, con Q4 teniendo el efecto más alto (0.06811).
+
+__Efecto de la Covariable – Price Index:__
+
+El coeficiente para price_index es -0.87430 y es significativo (p = 0.00698).
+Esto indica que, controlando por los efectos del año y del trimestre, por cada aumento unitario en el índice de precios, las ventas disminuyen en aproximadamente 0.87 unidades.
+Este resultado es consistente con la hipótesis de que un mayor precio se asocia a menores ventas.
+
+__Ajuste del Modelo:__
+
+El R² múltiple es 0.9988 (ajustado 0.9982), lo que nos indica que prácticamente el 99.9% de la variabilidad en las ventas se explica con este modelo.
+El F-statistic es muy alto (1612 sobre 13 y 25 grados de libertad) con un p-valor menor a 2.2e-16, lo que confirma que, en conjunto, los efectos de año, trimestre y precio son altamente significativos.
+
+__Interpretación General:__
+Concluimos que el principal motor de la variabilidad en las ventas es el efecto del año, ya que los coeficientes de los años aumentan progresivamente, mostrando una tendencia de crecimiento en el tiempo.
+El efecto del trimestre también es significativo, aunque en menor magnitud, lo que sugiere una ligera variación estacional dentro del año.
+
+Además, el precio (price_index) tiene un impacto significativo y negativo, reforzando la relación inversa entre precio y ventas.
+
+Es posible que la falta de Q1 en 1962 subestime la variabilidad interna de ese año, lo que podría afectar ligeramente la estimación de los efectos anuales.
+Sin embargo, dado que el modelo ajusta tanto efectos anuales como estacionales, y la significación de los efectos es muy alta, nosotros interpretamos que la tendencia de crecimiento en las ventas y el impacto negativo del precio son robustos, aunque es importante mencionar esta limitación en la interpretación final.
