@@ -1,4 +1,4 @@
-# Applied Regression Models with R – UNED Final Exam (Freeny Dataset)
+# Applied Regression Models with R (Freeny Dataset)
 
 This repository contains the final assessment for the Regression Models module, part of the Master’s in Big Data and Data Science Applied to Economics and Business at UNED (2024–2025).
 
