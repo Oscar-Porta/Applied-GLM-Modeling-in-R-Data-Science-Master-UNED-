@@ -1,35 +1,49 @@
-# Applied-GLM-Modeling-in-R-Data-Science-Master-UNED-
+# Applied Regression Models with R – UNED Final Exam (Freeny Dataset)
 
+This repository contains the final assessment for the Regression Models module, part of the Master’s in Big Data and Data Science Applied to Economics and Business at UNED (2024–2025).
 
-# Applied GLM Modeling in R – Data Science Master (UNED)
+## 🎯 Objective
 
-This repository contains a complete predictive modeling project developed in R as part of the "Generalized Linear Models" module (Module 3) of the Master in Big Data and Data Science Applied to Economics and Business at UNED (2024–2025).
+To solve a set of regression modeling exercises using R and RMarkdown, with full commentary, diagnostics, and interpretation. The analysis is based on the **Freeny** dataset included in the `memisc` package, which contains quarterly toy sales and economic indicators.
 
-## 📌 Project Overview
+## 🧪 Exam Structure
 
-The goal of this analysis is to apply Generalized Linear Models (GLMs) to business-related data using R. The project includes the entire modeling pipeline:
+### 1. Simple Linear Regression
+- Reading and summarizing the Freeny dataset.
+- Estimating a linear model of price vs. sales.
+- Confidence intervals and residual diagnostics.
+- Significance test of negative relationship (one-sided test, α = 0.05).
 
-- Exploratory data analysis (EDA)
-- Model selection and validation
-- Linear and generalized linear regression (Poisson, Logistic)
-- Use of `caret` for model training and evaluation
-- Model diagnostics and interpretation
+### 2. Multiple Regression
+- Selecting the best explanatory model for toy sales.
+- Comparison of GLM models using AIC and pseudo R².
+- Bayesian regression and comparison with classical methods.
+- Cook’s distance and robust estimation (if needed).
+- Evaluation of OLS vs. Ridge regression when multicollinearity is present.
 
-## 🔧 Tools and Packages
+### 3. Polynomial Regression
+- Modeling nonlinear relationships between price and sales.
 
-- R and RStudio  
-- caret, ggplot2, dplyr, broom, MASS  
-- HTML output generated with RMarkdown  
+### 4. ANOVA and ANCOVA
+- Creating temporal variables (year and quarter).
+- Fitting an ANOVA model with time-based factors.
+- Fitting an ANCOVA model including price as covariate.
+- Interpretation of results.
 
-## 📄 Output
+## ⚙️ Tools and Libraries
 
-The final report is included in the file:  
-📎 `Oscar_Porta_Examen-2025-Modulo-3.html`
+- R  
+- `memisc`, `ggplot2`, `broom`, `car`, `arm`, `MASS`  
+- `rstanarm` or `brms` (optional Bayesian)  
+- RMarkdown for structured reporting
 
-It contains code, visualizations, interpretations, and conclusions written from a professional data science perspective.
+## 📁 Files Included
+
+- `Examen 2025 Modulo 3.html` – Final rendered HTML  
+- `Examen 2025 Modulo 3.Rmd` – Full RMarkdown source code
 
 ## 👨‍💻 Author
 
 Óscar Porta  
-Master's Student in Big Data & Data Science – UNED  
+Master’s Student in Big Data & Data Science – UNED  
 GitHub: [Oscar-Porta](https://github.com/Oscar-Porta)
